@@ -58,20 +58,6 @@ docker compose up --build
 
 Copy `web/.env.example` to `web/.env.local` and `server/.env.example` to `server/.env` to customize.
 
-## Publish to GitHub
-
-```bash
-cd scrum-poker
-git init
-git add .
-git commit -m "Scrum Poker Online — Next.js + NestJS realtime planning poker"
-git branch -M main
-git remote add origin https://github.com/<your-username>/scrum-poker.git
-git push -u origin main
-```
-
-The included GitHub Actions workflow builds both apps on every push and pull request.
-
 ## Deploy
 
 The frontend and backend deploy separately (the backend holds live WebSocket connections, so it needs a long-running host — not serverless).
