@@ -1,152 +1,36 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
-import { DECK, NAME_KEY, SOCKET_URL, cardNumericValue } from '@/lib/game';
-
-interface PublicParticipant {
-  id: string;
-  name: string;
-  hasVoted: boolean;
-  vote?: string | null;
-  spectator: boolean;
-}
-
-interface RoomState {
-  id: string;
-  revealed: boolean;
-  round: number;
-  participants: PublicParticipant[];
-}
-
-type ConnStatus = 'connecting' | 'connected' | 'error';
+import { DECK, seatStyle } from '@/lib/game';
+import { useRoom } from './useRoom';
 
 export default function RoomClient({ roomId }: { roomId: string }) {
-  const [name, setName] = useState<string | null>(null);
-  const [nameDraft, setNameDraft] = useState('');
-  const [spectator, setSpectator] = useState(false);
-  const [room, setRoom] = useState<RoomState | null>(null);
-  const [myId, setMyId] = useState<string | null>(null);
-  const [status, setStatus] = useState<ConnStatus>('connecting');
-  const [copied, setCopied] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const {
+    name,
+    nameDraft,
+    setNameDraft,
+    spectator,
+    setSpectator,
+    submitName,
+    room,
+    myId,
+    status,
+    errorMsg,
+    me,
+    isAdmin,
+    voters,
+    votesIn,
+    results,
+    myVote,
+    castVote,
+    reveal,
+    newRound,
+    makeAdmin,
+    toggleSpectator,
+    copied,
+    copyLink,
+  } = useRoom(roomId);
 
-  // Load a remembered name once on the client
-  useEffect(() => {
-    const saved = localStorage.getItem(NAME_KEY);
-    if (saved) setName(saved);
-    setNameDraft(saved ?? '');
-  }, []);
-
-  // Connect once we know who the player is
-  useEffect(() => {
-    if (!name) return;
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setMyId(socket.id ?? null);
-      setStatus('connected');
-      socket.emit('room:join', { roomId, name, spectator });
-    });
-    socket.on('room:state', (state: RoomState) => setRoom(state));
-    socket.on('connect_error', () => setStatus('error'));
-    socket.on('disconnect', () => setStatus('connecting'));
-
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-    // spectator changes are sent through their own event, not a reconnect
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, roomId]);
-
-  const me = useMemo(
-    () => room?.participants.find((p) => p.id === myId) ?? null,
-    [room, myId],
-  );
-
-  const voters = useMemo(
-    () => room?.participants.filter((p) => !p.spectator) ?? [],
-    [room],
-  );
-
-  const votesIn = voters.filter((p) => p.hasVoted).length;
-
-  const results = useMemo(() => {
-    if (!room?.revealed) return null;
-    const values = voters
-      .map((p) => (p.vote != null ? cardNumericValue(p.vote) : null))
-      .filter((v): v is number => v !== null);
-    const cast = voters.filter((p) => p.vote != null);
-    const average = values.length
-      ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
-      : null;
-    const consensus =
-      cast.length > 1 && cast.every((p) => p.vote === cast[0].vote) ? cast[0].vote : null;
-    return { average, consensus, castCount: cast.length };
-  }, [room, voters]);
-
-  // My selected card comes from server state after reveal; before reveal we track it locally
-  const [myVote, setMyVote] = useState<string | null>(null);
-  useEffect(() => {
-    if (room && !room.revealed && me && !me.hasVoted) setMyVote(null);
-  }, [room, me]);
-  useEffect(() => {
-    // new round → clear local selection
-    setMyVote(null);
-  }, [room?.round]);
-
-  const submitName = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const trimmed = nameDraft.trim();
-      if (!trimmed) return;
-      localStorage.setItem(NAME_KEY, trimmed);
-      setName(trimmed);
-    },
-    [nameDraft],
-  );
-
-  function castVote(value: string) {
-    if (!room || room.revealed || me?.spectator) return;
-    setMyVote((prev) => (prev === value ? null : value));
-    socketRef.current?.emit('room:vote', { value });
-  }
-
-  function reveal() {
-    socketRef.current?.emit('room:reveal');
-  }
-
-  function newRound() {
-    socketRef.current?.emit('room:reset');
-  }
-
-  function toggleSpectator() {
-    const next = !spectator;
-    setSpectator(next);
-    setMyVote(null);
-    socketRef.current?.emit('room:spectator', { spectator: next });
-  }
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // clipboard unavailable — the visible code still lets people join manually
-    }
-  }
-
-  // seat positions around the table ellipse
   const seats = room?.participants ?? [];
-  const seatStyle = (index: number, total: number): React.CSSProperties => {
-    const angle = (-90 + (360 / Math.max(total, 1)) * index) * (Math.PI / 180);
-    const left = 50 + 41 * Math.cos(angle);
-    const top = 50 + 40 * Math.sin(angle);
-    return { left: `${left}%`, top: `${top}%` };
-  };
 
   if (!name) {
     return (
@@ -217,6 +101,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       {status === 'connecting' && (
         <p className="conn-note">Connecting to the table…</p>
       )}
+      {errorMsg && <p className="conn-note error">{errorMsg}</p>}
 
       <main className="table-zone">
         <div className="table-wrap">
@@ -238,13 +123,19 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                     {results.consensus && (
                       <div className="consensus">Consensus on {results.consensus} 🎉</div>
                     )}
-                    <button
-                      className="btn btn-gold"
-                      onClick={newRound}
-                      style={{ marginTop: '0.7rem' }}
-                    >
-                      Start next round
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        className="btn btn-gold"
+                        onClick={newRound}
+                        style={{ marginTop: '0.7rem' }}
+                      >
+                        Start next round
+                      </button>
+                    ) : (
+                      <p style={{ marginTop: '0.7rem' }}>
+                        Waiting for the room admin to start the next round.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -255,15 +146,19 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                   <p>
                     {voters.length < 2
                       ? 'Share the invite link to deal your team in.'
-                      : 'Reveal when everyone has picked.'}
+                      : isAdmin
+                        ? 'Reveal when everyone has picked.'
+                        : 'Waiting for the room admin to reveal the cards.'}
                   </p>
-                  <button
-                    className="btn btn-gold"
-                    onClick={reveal}
-                    disabled={votesIn === 0}
-                  >
-                    Reveal cards
-                  </button>
+                  {isAdmin && (
+                    <button
+                      className="btn btn-gold"
+                      onClick={reveal}
+                      disabled={votesIn === 0}
+                    >
+                      Reveal cards
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -271,6 +166,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
           {seats.map((p, i) => {
             const isMe = p.id === myId;
+            const isSeatAdmin = p.id === room?.adminId;
             const cardClass = p.spectator
               ? 'seat-card spectator'
               : room?.revealed
@@ -289,9 +185,19 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                   </div>
                 </div>
                 <span className="seat-name">
+                  {isSeatAdmin && (
+                    <span className="crown" title="Room admin" aria-label="Room admin">
+                      👑{' '}
+                    </span>
+                  )}
                   {p.name}
                   {isMe && <span className="you"> (you)</span>}
                 </span>
+                {isAdmin && !isMe && (
+                  <button className="make-admin-btn" onClick={() => makeAdmin(p.id)}>
+                    Make admin
+                  </button>
+                )}
               </div>
             );
           })}

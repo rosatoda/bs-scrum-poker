@@ -71,6 +71,10 @@ export class RoomsGateway implements OnGatewayDisconnect {
   handleReveal(@ConnectedSocket() client: Socket): void {
     const roomId = this.roomOf(client);
     if (!roomId) return;
+    if (!this.rooms.isAdmin(roomId, client.id)) {
+      client.emit('room:error', { message: 'Only the room admin can reveal cards.' });
+      return;
+    }
     this.rooms.reveal(roomId);
     this.broadcast(roomId);
   }
@@ -79,7 +83,26 @@ export class RoomsGateway implements OnGatewayDisconnect {
   handleReset(@ConnectedSocket() client: Socket): void {
     const roomId = this.roomOf(client);
     if (!roomId) return;
+    if (!this.rooms.isAdmin(roomId, client.id)) {
+      client.emit('room:error', { message: 'Only the room admin can start the next round.' });
+      return;
+    }
     this.rooms.reset(roomId);
+    this.broadcast(roomId);
+  }
+
+  @SubscribeMessage('room:transfer-admin')
+  handleTransferAdmin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { targetId: string },
+  ): void {
+    const roomId = this.roomOf(client);
+    if (!roomId) return;
+    if (!this.rooms.isAdmin(roomId, client.id)) {
+      client.emit('room:error', { message: 'Only the room admin can pass on that role.' });
+      return;
+    }
+    this.rooms.transferAdmin(roomId, client.id, String(payload?.targetId ?? ''));
     this.broadcast(roomId);
   }
 

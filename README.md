@@ -11,6 +11,7 @@ Free, real-time planning poker for agile teams — inspired by scrumpoker-online
 - Fibonacci deck: `0 ½ 1 2 3 5 8 13 20 40 100 ? ☕`
 - Reveal all cards at once with a 3D flip, see the average, votes cast, and consensus
 - Start the next round with cleared votes and a round counter
+- Room admin: only the room's creator can reveal cards or start the next round; they can pass the admin role to anyone else at the table, giving it up in the process
 - Spectator mode, tap-again to retract a vote, remembered player name
 - No accounts, no database — empty rooms are purged automatically
 
@@ -85,12 +86,13 @@ Clients talk to a single Socket.IO gateway:
 | ----------------------- | --------------------------- | --------------------------------- |
 | `room:join`             | `{ roomId, name, spectator }` | Join (and lazily create) a room |
 | `room:vote`             | `{ value }`                 | Cast a card; same value retracts  |
-| `room:reveal`           | —                           | Flip all cards for the room       |
-| `room:reset`            | —                           | Clear votes, next round           |
+| `room:reveal`           | —                           | Flip all cards for the room (admin only) |
+| `room:reset`            | —                           | Clear votes, next round (admin only) |
 | `room:spectator`        | `{ spectator }`             | Toggle spectator mode             |
 | `room:rename`           | `{ name }`                  | Change display name               |
+| `room:transfer-admin`   | `{ targetId }`               | Pass the admin role to another participant (admin only) |
 
-The server broadcasts `room:state` after every change. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic.
+The server broadcasts `room:state` after every change, including the room's `adminId` so clients know who can reveal/reset. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic. The first participant to join a room becomes its admin; if they disconnect, the role passes automatically to whoever has been seated the longest. Unauthorized `room:reveal`/`room:reset`/`room:transfer-admin` attempts get a `room:error` reply instead of being applied.
 
 ## License
 

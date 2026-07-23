@@ -17,6 +17,8 @@ export interface Room {
   revealed: boolean;
   round: number;
   createdAt: number;
+  /** socket id of the participant who can reveal/reset; transferable */
+  adminId: string | null;
 }
 
 /** State as broadcast to clients. Votes are masked until reveal. */
@@ -34,6 +36,8 @@ export interface PublicRoomState {
   revealed: boolean;
   round: number;
   participants: PublicParticipant[];
+  /** socket id of the participant who can reveal/reset and pass on the role */
+  adminId: string | null;
 }
 
 const ROOM_TTL_MS = 1000 * 60 * 60 * 6; // purge empty rooms after 6h
@@ -76,6 +80,7 @@ export class RoomsService {
       revealed: false,
       round: 1,
       createdAt: Date.now(),
+      adminId: null,
     };
     this.rooms.set(roomId, room);
     return room;
@@ -95,6 +100,8 @@ export class RoomsService {
       spectator,
       joinedAt: Date.now(),
     });
+    // Whoever is first to join an admin-less room (typically its creator) takes the gavel.
+    if (!room.adminId) room.adminId = socketId;
     return room;
   }
 
@@ -102,10 +109,28 @@ export class RoomsService {
     const room = this.rooms.get(roomId);
     if (!room) return undefined;
     room.participants.delete(socketId);
+    if (room.adminId === socketId) {
+      // Hand the gavel to whoever has been at the table longest; none left → no admin yet.
+      const next = [...room.participants.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      room.adminId = next?.id ?? null;
+    }
     if (room.participants.size === 0) {
       // keep the room around briefly (purge handles cleanup) so refreshes rejoin seamlessly
       room.revealed = false;
     }
+    return room;
+  }
+
+  isAdmin(roomId: string, socketId: string): boolean {
+    return this.rooms.get(roomId)?.adminId === socketId;
+  }
+
+  transferAdmin(roomId: string, fromSocketId: string, toSocketId: string): Room | undefined {
+    const room = this.rooms.get(roomId);
+    if (!room) return undefined;
+    if (room.adminId !== fromSocketId) return room; // only the current admin can pass it on
+    if (toSocketId === fromSocketId || !room.participants.has(toSocketId)) return room;
+    room.adminId = toSocketId;
     return room;
   }
 
@@ -169,6 +194,7 @@ export class RoomsService {
       revealed: room.revealed,
       round: room.round,
       participants,
+      adminId: room.adminId,
     };
   }
 }
