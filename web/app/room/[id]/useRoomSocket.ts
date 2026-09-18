@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { SOCKET_URL } from '@/lib/game';
-import type { RoomState } from '@/lib/types';
+import type { Role, RoomState } from '@/lib/types';
 
 export type ConnStatus = 'connecting' | 'connected' | 'error';
 
@@ -14,7 +14,7 @@ const ERROR_TOAST_MS = 3000;
  * known, joins the room, and keeps `room`/`myId`/`status` in sync with server
  * broadcasts. Reconnects whenever `name` or `roomId` changes.
  */
-export function useRoomSocket(roomId: string, name: string | null, spectator: boolean) {
+export function useRoomSocket(roomId: string, name: string | null, spectator: boolean, role: Role) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
   const [status, setStatus] = useState<ConnStatus>('connecting');
@@ -29,7 +29,7 @@ export function useRoomSocket(roomId: string, name: string | null, spectator: bo
     socket.on('connect', () => {
       setMyId(socket.id ?? null);
       setStatus('connected');
-      socket.emit('room:join', { roomId, name, spectator });
+      socket.emit('room:join', { roomId, name, spectator, role });
     });
     socket.on('room:state', (state: RoomState) => setRoom(state));
     socket.on('room:error', (payload: { message: string }) => {

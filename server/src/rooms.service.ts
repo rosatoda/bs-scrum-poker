@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 
 export type CardValue = string; // '0' | '½' | '1' ... '?' | '☕'
 
+export type Role = 'DEV' | 'QA';
+
 export interface Participant {
   /** socket id */
   id: string;
   name: string;
   vote: CardValue | null;
   spectator: boolean;
+  role: Role;
   joinedAt: number;
 }
 
@@ -29,6 +32,7 @@ export interface PublicParticipant {
   /** only present when room is revealed */
   vote?: CardValue | null;
   spectator: boolean;
+  role: Role;
 }
 
 export interface PublicRoomState {
@@ -90,7 +94,7 @@ export class RoomsService {
     return this.rooms.get(id);
   }
 
-  join(roomId: string, socketId: string, name: string, spectator = false): Room {
+  join(roomId: string, socketId: string, name: string, spectator = false, role: Role = 'DEV'): Room {
     const room = this.createRoom(roomId);
     const safeName = (name || 'Guest').trim().slice(0, MAX_NAME_LENGTH) || 'Guest';
     room.participants.set(socketId, {
@@ -98,6 +102,7 @@ export class RoomsService {
       name: safeName,
       vote: null,
       spectator,
+      role: role === 'QA' ? 'QA' : 'DEV',
       joinedAt: Date.now(),
     });
     // Whoever is first to join an admin-less room (typically its creator) takes the gavel.
@@ -168,6 +173,15 @@ export class RoomsService {
     return room;
   }
 
+  /** Switching role is only meaningful before a round is revealed. */
+  setRole(roomId: string, socketId: string, role: Role): Room | undefined {
+    const room = this.rooms.get(roomId);
+    const participant = room?.participants.get(socketId);
+    if (!room || !participant || room.revealed) return room;
+    participant.role = role === 'QA' ? 'QA' : 'DEV';
+    return room;
+  }
+
   rename(roomId: string, socketId: string, name: string): Room | undefined {
     const room = this.rooms.get(roomId);
     const participant = room?.participants.get(socketId);
@@ -185,6 +199,7 @@ export class RoomsService {
           name: p.name,
           hasVoted: p.vote !== null,
           spectator: p.spectator,
+          role: p.role,
         };
         if (room.revealed) base.vote = p.vote;
         return base;

@@ -7,12 +7,13 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { CardValue, RoomsService } from './rooms.service';
+import { CardValue, Role, RoomsService } from './rooms.service';
 
 interface JoinPayload {
   roomId: string;
   name: string;
   spectator?: boolean;
+  role?: Role;
 }
 
 @WebSocketGateway({
@@ -51,7 +52,7 @@ export class RoomsGateway implements OnGatewayDisconnect {
       this.rooms.leave(previous, client.id);
       this.broadcast(previous);
     }
-    this.rooms.join(roomId, client.id, payload?.name, Boolean(payload?.spectator));
+    this.rooms.join(roomId, client.id, payload?.name, Boolean(payload?.spectator), payload?.role);
     client.data.roomId = roomId;
     client.join(roomId);
     this.broadcast(roomId);
@@ -111,6 +112,16 @@ export class RoomsGateway implements OnGatewayDisconnect {
     const roomId = this.roomOf(client);
     if (!roomId) return;
     this.rooms.setSpectator(roomId, client.id, Boolean(payload?.spectator));
+    this.broadcast(roomId);
+  }
+
+  @SubscribeMessage('room:role')
+  handleRole(@ConnectedSocket() client: Socket, @MessageBody() payload: { role: Role }): void {
+    const roomId = this.roomOf(client);
+    if (!roomId) return;
+    const room = this.rooms.getRoom(roomId);
+    if (!room || room.revealed) return; // role can only change before a round is revealed
+    this.rooms.setRole(roomId, client.id, payload?.role === 'QA' ? 'QA' : 'DEV');
     this.broadcast(roomId);
   }
 

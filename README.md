@@ -9,7 +9,8 @@ Free, real-time planning poker for agile teams — inspired by scrumpoker-online
 - Create a room with one click — 8-digit room codes and shareable invite links
 - Real-time voting over WebSockets: everyone sees who has a card down, but values stay hidden server-side until reveal
 - Fibonacci deck: `0 ½ 1 2 3 5 8 13 20 40 100 ? ☕`
-- Reveal all cards at once with a 3D flip, see the average, votes cast, and consensus
+- Join as DEV or QA (default DEV) — pick a role when you join, switch anytime before a round is revealed
+- Reveal all cards at once with a 3D flip, see three averages (joint, DEV, QA), votes cast, and consensus
 - Start the next round with cleared votes and a round counter
 - Room admin: only the room's creator can reveal cards or start the next round; they can pass the admin role to anyone else at the table, giving it up in the process
 - Spectator mode, tap-again to retract a vote, remembered player name
@@ -84,15 +85,16 @@ Clients talk to a single Socket.IO gateway:
 
 | Event (client → server) | Payload                     | Effect                            |
 | ----------------------- | --------------------------- | --------------------------------- |
-| `room:join`             | `{ roomId, name, spectator }` | Join (and lazily create) a room |
+| `room:join`             | `{ roomId, name, spectator, role }` | Join (and lazily create) a room; `role` is `'DEV'` or `'QA'`, defaults to `'DEV'` |
 | `room:vote`             | `{ value }`                 | Cast a card; same value retracts  |
 | `room:reveal`           | —                           | Flip all cards for the room (admin only) |
 | `room:reset`            | —                           | Clear votes, next round (admin only) |
 | `room:spectator`        | `{ spectator }`             | Toggle spectator mode             |
+| `room:role`             | `{ role }`                  | Switch between DEV and QA; ignored once the round is revealed |
 | `room:rename`           | `{ name }`                  | Change display name               |
 | `room:transfer-admin`   | `{ targetId }`               | Pass the admin role to another participant (admin only) |
 
-The server broadcasts `room:state` after every change, including the room's `adminId` so clients know who can reveal/reset. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic. The first participant to join a room becomes its admin; if they disconnect, the role passes automatically to whoever has been seated the longest. Unauthorized `room:reveal`/`room:reset`/`room:transfer-admin` attempts get a `room:error` reply instead of being applied.
+The server broadcasts `room:state` after every change, including the room's `adminId` so clients know who can reveal/reset. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic. The first participant to join a room becomes its admin; if they disconnect, the role passes automatically to whoever has been seated the longest. Unauthorized `room:reveal`/`room:reset`/`room:transfer-admin` attempts get a `room:error` reply instead of being applied. Once cards are revealed, results show three averages — joint (everyone), DEV-only, and QA-only — computed from each participant's `role`.
 
 ## License
 

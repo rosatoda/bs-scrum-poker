@@ -118,6 +118,27 @@ button {
   background: rgba(244, 248, 244, 0.18);
 }
 
+.btn-quiet:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-quiet.active {
+  background: var(--gold);
+  color: #2b1f07;
+  border-color: var(--gold);
+}
+
+.role-toggle {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.role-toggle .btn {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.82rem;
+}
+
 .input {
   background: rgba(9, 38, 27, 0.6);
   border: 1px solid rgba(167, 198, 182, 0.35);
@@ -412,6 +433,7 @@ button {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-direction: column;
 }
 
 .seat-name .you {
@@ -420,6 +442,25 @@ button {
 
 .crown {
   font-size: 0.78em;
+}
+
+.role-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.32rem;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.role-badge.role-dev {
+  background: rgba(90, 158, 217, 0.25);
+  color: #9cc7f2;
+}
+
+.role-badge.role-qa {
+  background: rgba(217, 129, 90, 0.25);
+  color: #f2b89c;
 }
 
 .make-admin-btn {

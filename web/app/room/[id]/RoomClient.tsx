@@ -10,6 +10,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     setNameDraft,
     spectator,
     setSpectator,
+    role,
+    setRole,
     submitName,
     room,
     myId,
@@ -20,12 +22,15 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     voters,
     votesIn,
     results,
+    devResults,
+    qaResults,
     myVote,
     castVote,
     reveal,
     newRound,
     makeAdmin,
     toggleSpectator,
+    switchRole,
     copied,
     copyLink,
   } = useRoom(roomId);
@@ -51,6 +56,24 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               onChange={(e) => setNameDraft(e.target.value)}
               aria-label="Your name"
             />
+            <div className="role-toggle" role="radiogroup" aria-label="Join as">
+              <button
+                type="button"
+                className={`btn btn-quiet ${role === 'DEV' ? 'active' : ''}`}
+                aria-pressed={role === 'DEV'}
+                onClick={() => setRole('DEV')}
+              >
+                DEV
+              </button>
+              <button
+                type="button"
+                className={`btn btn-quiet ${role === 'QA' ? 'active' : ''}`}
+                aria-pressed={role === 'QA'}
+                onClick={() => setRole('QA')}
+              >
+                QA
+              </button>
+            </div>
             <label className="check-row">
               <input
                 type="checkbox"
@@ -87,6 +110,28 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
         <div className="header-actions">
           <span className="round-chip">Round {room?.round ?? 1}</span>
+         {!me?.spectator && <div className="role-toggle" role="radiogroup" aria-label="Your role">
+            <button
+              type="button"
+              className={`btn btn-quiet ${me?.role === 'DEV' ? 'active' : ''}`}
+              aria-pressed={me?.role === 'DEV'}
+              disabled={room?.revealed}
+              title={room?.revealed ? 'Role can be changed before the next round' : undefined}
+              onClick={() => switchRole('DEV')}
+            >
+              DEV
+            </button>
+            <button
+              type="button"
+              className={`btn btn-quiet ${me?.role === 'QA' ? 'active' : ''}`}
+              aria-pressed={me?.role === 'QA'}
+              disabled={room?.revealed}
+              title={room?.revealed ? 'Role can be changed before the next round' : undefined}
+              onClick={() => switchRole('QA')}
+            >
+              QA
+            </button>
+          </div>}
           <button className="btn btn-quiet" onClick={toggleSpectator}>
             {me?.spectator ? 'Join the vote' : 'Spectate'}
           </button>
@@ -111,7 +156,15 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                 <div className="results">
                   <div className="result-stat">
                     <div className="value">{results.average ?? '—'}</div>
-                    <div className="label">Average</div>
+                    <div className="label">Joint average</div>
+                  </div>
+                  <div className="result-stat">
+                    <div className="value">{devResults?.average ?? '—'}</div>
+                    <div className="label">DEV average</div>
+                  </div>
+                  <div className="result-stat">
+                    <div className="value">{qaResults?.average ?? '—'}</div>
+                    <div className="label">QA average</div>
                   </div>
                   <div className="result-stat">
                     <div className="value">
@@ -127,7 +180,6 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                       <button
                         className="btn btn-gold"
                         onClick={newRound}
-                        style={{ marginTop: '0.7rem' }}
                       >
                         Start next round
                       </button>
@@ -187,8 +239,11 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                 <span className="seat-name">
                   {isSeatAdmin && (
                     <span className="crown" title="Room admin" aria-label="Room admin">
-                      👑{' '}
+                      👑
                     </span>
+                  )}
+                  {!p.spectator && (
+                    <span className={`role-badge role-${p.role.toLowerCase()}`}>{p.role}</span>
                   )}
                   {p.name}
                   {isMe && <span className="you"> (you)</span>}

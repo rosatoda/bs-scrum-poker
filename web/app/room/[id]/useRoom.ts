@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NAME_KEY, computeResults } from '@/lib/game';
+import type { Role } from '@/lib/types';
 import { useRoomSocket } from './useRoomSocket';
 
 const COPIED_TOAST_MS = 1800;
@@ -15,6 +16,7 @@ export function useRoom(roomId: string) {
   const [name, setName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [spectator, setSpectator] = useState(false);
+  const [role, setRole] = useState<Role>('DEV');
   const [copied, setCopied] = useState(false);
 
   // Load a remembered name once on the client
@@ -24,7 +26,7 @@ export function useRoom(roomId: string) {
     setNameDraft(saved ?? '');
   }, []);
 
-  const { room, myId, status, errorMsg, emit } = useRoomSocket(roomId, name, spectator);
+  const { room, myId, status, errorMsg, emit } = useRoomSocket(roomId, name, spectator, role);
 
   const me = useMemo(
     () => room?.participants.find((p) => p.id === myId) ?? null,
@@ -38,11 +40,22 @@ export function useRoom(roomId: string) {
     [room],
   );
 
+  const devVoters = useMemo(() => voters.filter((p) => p.role === 'DEV'), [voters]);
+  const qaVoters = useMemo(() => voters.filter((p) => p.role === 'QA'), [voters]);
+
   const votesIn = voters.filter((p) => p.hasVoted).length;
 
   const results = useMemo(
     () => (room?.revealed ? computeResults(voters) : null),
     [room, voters],
+  );
+  const devResults = useMemo(
+    () => (room?.revealed ? computeResults(devVoters) : null),
+    [room, devVoters],
+  );
+  const qaResults = useMemo(
+    () => (room?.revealed ? computeResults(qaVoters) : null),
+    [room, qaVoters],
   );
 
   // My selected card comes from server state after reveal; before reveal we track it locally
@@ -86,6 +99,15 @@ export function useRoom(roomId: string) {
     emit('room:spectator', { spectator: next });
   }, [spectator, emit]);
 
+  const switchRole = useCallback(
+    (next: Role) => {
+      if (next === role || room?.revealed) return;
+      setRole(next);
+      emit('room:role', { role: next });
+    },
+    [role, room, emit],
+  );
+
   const copyLink = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -103,6 +125,8 @@ export function useRoom(roomId: string) {
     setNameDraft,
     spectator,
     setSpectator,
+    role,
+    setRole,
     submitName,
     // connection + room state
     room,
@@ -113,8 +137,12 @@ export function useRoom(roomId: string) {
     me,
     isAdmin,
     voters,
+    devVoters,
+    qaVoters,
     votesIn,
     results,
+    devResults,
+    qaResults,
     myVote,
     // actions
     castVote,
@@ -122,6 +150,7 @@ export function useRoom(roomId: string) {
     newRound,
     makeAdmin,
     toggleSpectator,
+    switchRole,
     copied,
     copyLink,
   };
