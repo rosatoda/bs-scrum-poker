@@ -94,7 +94,7 @@ Clients talk to a single Socket.IO gateway:
 | `room:rename`           | `{ name }`                  | Change display name               |
 | `room:transfer-admin`   | `{ targetId }`               | Pass the admin role to another participant (admin only) |
 
-The server broadcasts `room:state` after every change, including the room's `adminId` so clients know who can reveal/reset. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic. The first participant to join a room becomes its admin; if they disconnect, the role passes automatically to whoever has been seated the longest. Unauthorized `room:reveal`/`room:reset`/`room:transfer-admin` attempts get a `room:error` reply instead of being applied. Once cards are revealed, results show three averages — joint (everyone), DEV-only, and QA-only — computed from each participant's `role`.
+The server broadcasts `room:state` after every change, including the room's `adminId` so clients know who can reveal/reset. Vote values are stripped from the payload until the room is revealed, so hidden votes can't be sniffed from network traffic. The first participant to join a room becomes its admin; if they disconnect, the role passes automatically to whoever has been seated the longest. Unauthorized `room:reveal`/`room:reset`/`room:transfer-admin` attempts get a `room:error` reply instead of being applied. Once cards are revealed, results show three averages — joint (DEV average + QA average), DEV-only, and QA-only — computed from each participant's `role`.
 
 ## License
 
